@@ -1,10 +1,13 @@
 import cv2
 import mediapipe
+import vgamepad
 from math_utils import Vector
 
 mp_hands = mediapipe.solutions.hands
 hands = mp_hands.Hands()
 mp_drawing = mediapipe.solutions.drawing_utils
+
+controller = vgamepad.VX360Gamepad()
 
 cam = cv2.VideoCapture(0)
 
@@ -38,6 +41,14 @@ while cam.isOpened():
             cv2.putText(frame, f"Thumb vector: {thumb_unit_vector}", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
             cv2.putText(frame, f"Index vector: {index_unit_vector}", (50, 100), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
             cv2.putText(frame, f"Angle: {thumb_index_angle}", (50, 150), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
+            
+            if thumb_index_angle > 10:
+                scaled_thumb_index_angle_value = int(((thumb_index_angle)/90) * 255)
+                controller.right_trigger(max(0, scaled_thumb_index_angle_value) if scaled_thumb_index_angle_value <= 255 else 255)
+                controller.update()
+            else:
+                controller.right_trigger(0)
+                controller.update()
             
     cv2.imshow("Test", frame)
     
