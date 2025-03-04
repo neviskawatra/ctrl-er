@@ -29,28 +29,38 @@ class Capture:
                     
                     vectors = self.get_vectors(frame, landmarks)
                     
-                    # cv2.putText(frame, f"Thumb vector: {vectors["thumb_unit_vector"]}", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
-                    # cv2.putText(frame, f"Index vector: {vectors["index_unit_vector"]}", (50, 100), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
-                    # cv2.putText(frame, f"Angle: {vectors["thumb_index_angle"]}", (50, 150), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
+                    cv2.putText(frame, f"Middle vector: {vectors["middle_unit_vector"]}", (50, 50), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 1)
+                    # cv2.putText(frame, f"Index vector: {vectors["index_unit_vector"]}", (50, 100), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
+                    # cv2.putText(frame, f"Angle: {vectors["thumb_index_angle"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                     
                     
-                    if vectors["thumb_index_angle"] > 10:
-                        scaled_thumb_index_angle_value = vectors["thumb_index_angle"]/90
+                    if vectors["thumb_index_angle"] > 5:
+                        scaled_thumb_index_angle_value = vectors["thumb_index_angle"]/70
                         capped_thumb_index_angle = max(0, min(1, scaled_thumb_index_angle_value))
-                        cv2.putText(frame, f"Capped val: {capped_thumb_index_angle}", (50, 150), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
+                        cv2.putText(frame, f"Capped val: {capped_thumb_index_angle}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                         self.controller.right_trigger_float(capped_thumb_index_angle)
                         self.controller.update()
                     else:
                         self.controller.right_trigger(0)
                         self.controller.update()
                     
-                    # cv2.putText(frame, f"Angle: {vectors["index_angle_from_vertical_line"]}", (50, 150), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
+                    # cv2.putText(frame, f"Angle: {vectors["index_angle_from_vertical_line"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                     
                     if vectors["index_angle_from_vertical_line"] >= 10 or vectors["index_angle_from_vertical_line"] <= -10:
-                        scaled_index_vertical_angle_value = vectors["index_angle_from_vertical_line"] / 90
+                        scaled_index_vertical_angle_value = vectors["index_angle_from_vertical_line"] / 45
                         self.controller.left_joystick_float(-max(-1, min(1, scaled_index_vertical_angle_value)), 0)
                         self.controller.update()
-                    
+                        
+                    if vectors["middle_unit_vector"][1] > 0.5:
+                        self.controller.left_trigger_float(vectors["middle_unit_vector"][1])
+                        self.controller.update()
+                    else:
+                        self.controller.left_trigger(0)
+                        self.controller.update()
+                        
+            else:
+                self.reset_controller()
+                
             cv2.imshow("Test", frame)
             
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -67,12 +77,17 @@ class Capture:
 
         index_base = landmarks.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_MCP]
         index_tip = landmarks.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
+        
+        middle_base = landmarks.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+        middle_tip = landmarks.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
 
         thumb_vector = [thumb_tip.x - thumb_base.x, thumb_tip.y - thumb_base.y]
         index_vector = [index_tip.x - index_base.x, index_tip.y - index_base.y]
+        middle_vector = [middle_tip.x - middle_base.x, middle_tip.y - middle_base.y]
 
         thumb_unit_vector = Vector.unit_vector(thumb_vector)
         index_unit_vector = Vector.unit_vector(index_vector)
+        middle_unit_vector = Vector.unit_vector(middle_vector)
 
         thumb_index_angle = Vector.calculate_angle(thumb_unit_vector, index_unit_vector)
         
@@ -82,8 +97,12 @@ class Capture:
             "thumb_index_angle" : thumb_index_angle,
             "thumb_unit_vector" : thumb_unit_vector,
             "index_unit_vector" : index_unit_vector,
-            "index_angle_from_vertical_line" : index_angle_from_vertical_line
+            "index_angle_from_vertical_line" : index_angle_from_vertical_line,
+            "middle_unit_vector" : middle_unit_vector
         }
+    
+    def reset_controller(self): # TODO
+        pass
         
 if __name__ == "__main__":
     input_capture = Capture()
