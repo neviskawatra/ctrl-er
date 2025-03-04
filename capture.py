@@ -1,6 +1,7 @@
 import cv2
 import mediapipe
 import vgamepad
+import threading
 from math_utils import Vector
 
 
@@ -13,29 +14,41 @@ class Capture:
         self.controller = vgamepad.VX360Gamepad()
 
         self.cam = cv2.VideoCapture(0)
-    
-    def start(self):
-        while self.cam.isOpened():
+
+        self.frame = None
+        self.lock = threading.Lock()
+        self.running = True
+        self.capture_thread = threading.Thread(target=self.capture_frames, daemon=True)
+        self.capture_thread.start()
+
+    def capture_frames(self):
+        while self.running:
             is_frame, frame = self.cam.read()
-            if not is_frame: 
-                break
-            
+            if not is_frame:
+                continue
             frame = cv2.flip(frame, 1)
-            
+
+            with self.lock:
+                self.frame = frame
+
+    def start(self):
+        while True:
+            with self.lock:
+                if self.frame is None:
+                    continue
+                frame = self.frame.copy()
+
             processed_frame = self.hands.process(frame)
 
             if processed_frame.multi_hand_landmarks:
                 for landmarks in processed_frame.multi_hand_landmarks:
                     
                     vectors = self.get_vectors(frame, landmarks)
-                    
-                    cv2.putText(frame, f"Middle vector: {vectors["middle_unit_vector"]}", (50, 50), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 1)
-                    # cv2.putText(frame, f"Index vector: {vectors["index_unit_vector"]}", (50, 100), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
-                    # cv2.putText(frame, f"Angle: {vectors["thumb_index_angle"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
-                    
-                    
+
+                    # cv2.putText(frame, f"Middle vector: {vectors['middle_unit_vector']}", (50, 50), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 1)
+
                     if vectors["thumb_index_angle"] > 5:
-                        scaled_thumb_index_angle_value = vectors["thumb_index_angle"]/70
+                        scaled_thumb_index_angle_value = vectors["thumb_index_angle"] / 70
                         capped_thumb_index_angle = max(0, min(1, scaled_thumb_index_angle_value))
                         cv2.putText(frame, f"Capped val: {capped_thumb_index_angle}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                         self.controller.right_trigger_float(capped_thumb_index_angle)
@@ -44,7 +57,7 @@ class Capture:
                         self.controller.right_trigger(0)
                         self.controller.update()
                     
-                    # cv2.putText(frame, f"Angle: {vectors["index_angle_from_vertical_line"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
+                    # cv2.putText(frame, f"Index Angle: {vectors["index_angle_from_vertical_line"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                     
                     if vectors["index_angle_from_vertical_line"] >= 10 or vectors["index_angle_from_vertical_line"] <= -10:
                         scaled_index_vertical_angle_value = vectors["index_angle_from_vertical_line"] / 45
@@ -64,6 +77,7 @@ class Capture:
             cv2.imshow("Test", frame)
             
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.stop()
                 break
             
         self.cam.release()
@@ -100,10 +114,17 @@ class Capture:
             "index_angle_from_vertical_line" : index_angle_from_vertical_line,
             "middle_unit_vector" : middle_unit_vector
         }
-    
-    def reset_controller(self): # TODO
-        pass
-        
+
+    def reset_controller(self):
+        self.controller.right_trigger(0)
+        self.controller.left_trigger(0)
+        self.controller.left_joystick_float(0, 0)
+        self.controller.update()
+
+    def stop(self):
+        self.running = False
+        self.cam.release()
+
 if __name__ == "__main__":
     input_capture = Capture()
     input_capture.start()
