@@ -1,7 +1,6 @@
 import math
 
 class Vector:
-    
     @classmethod
     def calculate_angle(cls, v1, v2):
         dot_product = v1[0] * v2[0] + v1[1] * v2[1]
