@@ -6,7 +6,7 @@ from math_utils import Vector
 
 
 class Capture:
-    def __init__(self):
+    def __init__(self) -> None:
         self.mp_hands = mediapipe.solutions.hands
         self.hands = self.mp_hands.Hands()
         self.mp_drawing = mediapipe.solutions.drawing_utils
@@ -21,7 +21,7 @@ class Capture:
         self.capture_thread = threading.Thread(target=self.capture_frames, daemon=True)
         self.capture_thread.start()
 
-    def capture_frames(self):
+    def capture_frames(self) -> None:
         while self.running:
             is_frame, frame = self.cam.read()
             if not is_frame:
@@ -31,7 +31,7 @@ class Capture:
             with self.lock:
                 self.frame = frame
 
-    def start(self):
+    def start(self) -> None:
         while True:
             with self.lock:
                 if self.frame is None:
@@ -60,7 +60,7 @@ class Capture:
                     # cv2.putText(frame, f"Index Angle: {vectors["index_angle_from_vertical_line"]}", (50, 150), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255), 2)
                     
                     if vectors["index_angle_from_vertical_line"] >= 10 or vectors["index_angle_from_vertical_line"] <= -10:
-                        scaled_index_vertical_angle_value = vectors["index_angle_from_vertical_line"] / 45
+                        scaled_index_vertical_angle_value = vectors["index_angle_from_vertical_line"] / 30
                         self.controller.left_joystick_float(-max(-1, min(1, scaled_index_vertical_angle_value)), 0)
                         self.controller.update()
                         
@@ -69,6 +69,13 @@ class Capture:
                         self.controller.update()
                     else:
                         self.controller.left_trigger(0)
+                        self.controller.update()
+                        
+                    if vectors["pinky_unit_vector"][1] < -0.5:
+                        self.controller.press_button(vgamepad.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
+                        self.controller.update()
+                    else:
+                        self.controller.release_button(vgamepad.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
                         self.controller.update()
                         
             else:
@@ -94,14 +101,19 @@ class Capture:
         
         middle_base = landmarks.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
         middle_tip = landmarks.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+        
+        pinky_base = landmarks.landmark[self.mp_hands.HandLandmark.PINKY_MCP]
+        pinky_tip = landmarks.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
 
         thumb_vector = [thumb_tip.x - thumb_base.x, thumb_tip.y - thumb_base.y]
         index_vector = [index_tip.x - index_base.x, index_tip.y - index_base.y]
         middle_vector = [middle_tip.x - middle_base.x, middle_tip.y - middle_base.y]
+        pinky_vector = [pinky_tip.x - pinky_base.x, pinky_tip.y - pinky_base.y]
 
         thumb_unit_vector = Vector.unit_vector(thumb_vector)
         index_unit_vector = Vector.unit_vector(index_vector)
         middle_unit_vector = Vector.unit_vector(middle_vector)
+        pinky_unit_vector = Vector.unit_vector(pinky_vector)
 
         thumb_index_angle = Vector.calculate_angle(thumb_unit_vector, index_unit_vector)
         
@@ -112,16 +124,17 @@ class Capture:
             "thumb_unit_vector" : thumb_unit_vector,
             "index_unit_vector" : index_unit_vector,
             "index_angle_from_vertical_line" : index_angle_from_vertical_line,
-            "middle_unit_vector" : middle_unit_vector
+            "middle_unit_vector" : middle_unit_vector,
+            "pinky_unit_vector" : pinky_unit_vector
         }
 
-    def reset_controller(self):
+    def reset_controller(self) -> None:
         self.controller.right_trigger(0)
         self.controller.left_trigger(0)
         self.controller.left_joystick_float(0, 0)
         self.controller.update()
 
-    def stop(self):
+    def stop(self) -> None:
         self.running = False
         self.cam.release()
 
